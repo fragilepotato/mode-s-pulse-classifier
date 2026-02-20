@@ -1,0 +1,55 @@
+# MATLAB
+*.asv
+*.m~
+*.mex*
+*.autosave
+slprj/
+*.slxc
+*.slx.autosave
+*.slxc
+
+# MATLAB Project files
+*.prj
+
+# Code generation folders
+codegen/
+*.sfx
+
+# Simulink
+*.slxp
+*.mdl
+*.mdlp
+sccprj/
+*.emf
+*.slxc
+
+# Temporary files
+*~
+~$*
+*.swp
+*.tmp
+*.temp
+
+# Build outputs
+build/
+dist/
+*.mex
+*.mexa64
+*.mexw64
+*.mexmaci64
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Large data files (uncomment if needed)
+# *.mat
+
+# Log files
+*.log
