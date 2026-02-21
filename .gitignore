@@ -13,6 +13,7 @@ slprj/
 
 # Code generation folders
 codegen/
+dlhdl_prj/
 *.sfx
 
 # Simulink
