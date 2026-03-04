@@ -1,59 +1,56 @@
-%% 1. Configure Resource-Optimized Processor for ZedBoard
-disp('Configuring Resource-Optimized Processor for ZedBoard...');
+disp('Generating fresh IP Core and Compiling for ZedBoard...');
 
-% Initialize the Processor Configuration object
+% 1. Create a fresh configuration for ZedBoard (xc7z020)
 hPC = dlhdl.ProcessorConfig;
 hPC.TargetPlatform = 'Generic Deep Learning Processor';
-
-% Force the compiler to use Zynq-7000 constraints
 hPC.SynthesisToolChipFamily = 'Zynq';
-hPC.SynthesisToolDeviceName = 'xc7z020'; 
+hPC.SynthesisToolDeviceName = 'xc7z020';
 hPC.SynthesisToolPackageName = 'clg484';
 hPC.SynthesisToolSpeedValue = '-1';
 
-% --- CRITICAL: FORCE INT8 HARDWARE GENERATION ---
+% Match the exact architecture
 hPC.ProcessorDataType = 'int8'; 
 hPC.UseVendorLibrary = 'off'; 
-
-% 1. Reduce Parallel Threads
 hPC.setModuleProperty('conv', 'ConvThreadNumber', 4); 
 hPC.setModuleProperty('fc', 'FCThreadNumber', 4);
-
-% 2. Shrink BRAM Allocations
 hPC.setModuleProperty('conv', 'InputMemorySize', [128 1 4]);
 hPC.setModuleProperty('conv', 'OutputMemorySize', [128 1 32]);
 hPC.setModuleProperty('fc', 'InputMemorySize', 1024); 
 hPC.setModuleProperty('fc', 'OutputMemorySize', 128);
-
-% 3. Disable the Custom Math Module
 hPC.setModuleProperty('custom', 'ModuleGeneration', 'off');
 
-% Set execution control
 hPC.InputRunTimeControl = 'register'; 
 hPC.OutputRunTimeControl = 'register'; 
 
-%% 2. Configure the Workflow to Bypass Version Checking
-disp('Configuring Workflow constraints...');
+% 2. Build the Processor to generate a clean hardware constraint file (.mat)
+disp('Building processor to generate hardware constraints...');
 hWC = hdlcoder.WorkflowConfig('SynthesisTool', 'Xilinx Vivado', 'TargetWorkflow', 'Deep Learning Processor');
 hWC.AllowUnsupportedToolVersion = true; 
 
-%% 3. Generate the Synthesizable IP Core
-disp('Generating the Deep Learning AXI-Stream IP Core...');
-
-% Run HDL Coder with the optimized hardware profile
 dlhdl.buildProcessor(hPC, 'ProjectFolder', 'dlhdl_prj', ...
                      'ProcessorName', 'mode_s_ip', ...
                      'WorkflowConfig', hWC);
-disp('IP Core successfully generated in the ./dlhdl_prj/ipcore directory!');
 
-%% 4. Initialize the Workflow Object for Compilation
-disp('Initializing HDL Workflow for Compilation...');
-
+% 3. Initialize the workflow using the FRESH .mat file with mapped memory
+disp('Initializing HDL Workflow with ZedBoard Memory Mapping...');
 ip_mat_path = fullfile('dlhdl_prj', 'mode_s_ip.mat');
-hW = dlhdl.Workflow('Network', quantObj, 'Bitstream', ip_mat_path);
 
-%% 5. Compile the Network Instructions
-disp('Compiling INT8 model into hardware instructions...');
+% Ensure the quantized model is loaded in the workspace
+if ~exist('quantObj', 'var')
+    load('mode_s_quantized_fpga.mat');
+end
+
+% Create a Bitstream object to explicitly declare the ZedBoard's 512MB DDR3 memory
+% '20000000' is 512MB in hexadecimal, bypassing the 0x0 bytes limitation
+hB = dlhdl.Bitstream(ip_mat_path, ...
+    'MemoryBaseAddress', '00000000', ...
+    'MemoryAddressRange', '20000000', ... 
+    'ProcessorBaseAddress', '40000000');
+
+% Pass the newly mapped Bitstream object (hB) to the workflow
+hW = dlhdl.Workflow('Network', quantObj, 'Bitstream', hB);
+
+% 4. Compile the instructions
+disp('Compiling network software binaries...');
 hW.compile();
-
-disp('Compilation complete! You are ready for Vivado integration.');
+disp('Compilation complete!');
